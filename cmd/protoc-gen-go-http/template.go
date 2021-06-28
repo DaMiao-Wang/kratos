@@ -30,16 +30,17 @@ func _{{$svrType}}_{{.Name}}{{.Num}}_HTTP_Handler(srv {{$svrType}}HTTPServer) fu
 		if err := ctx.Bind(&in{{.Body}}); err != nil {
 			return err
 		}
-		{{- else}}
-		if err := ctx.BindQuery(&in{{.Body}}); err != nil {
-			return err
-		}
 		{{- end}}
 		{{- if .HasVars}}
 		if err := ctx.BindVars(&in); err != nil {
 			return err
 		}
 		{{- end}}
+		{{-if .HasQuery}}
+		if err := ctx.BindForm(&in); err != nil {
+			return err
+		}
+		{{-end}}
 		http.SetOperation(ctx,"/{{$svrName}}/{{.Name}}")
 		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
 			return srv.{{.Name}}(ctx, req.(*{{.Request}}))
@@ -72,7 +73,7 @@ func New{{.ServiceType}}HTTPClient (client *http.Client) {{.ServiceType}}HTTPCli
 func (c *{{$svrType}}HTTPClientImpl) {{.Name}}(ctx context.Context, in *{{.Request}}, opts ...http.CallOption) (*{{.Reply}}, error) {
 	var out {{.Reply}}
 	pattern := "{{.Path}}"
-	path := binding.EncodeURL(pattern, in, {{not .HasBody}})
+	path := binding.EncodeURL(pattern, in, {{.HasQuery}})
 	opts = append(opts, http.Operation("/{{$svrName}}/{{.Name}}"))
 	opts = append(opts, http.PathTemplate(pattern))
 	{{if .HasBody -}}
@@ -105,10 +106,12 @@ type methodDesc struct {
 	// http_rule
 	Path         string
 	Method       string
+	Vars         []string
 	HasVars      bool
 	HasBody      bool
 	Body         string
 	ResponseBody string
+	HasQuery     bool
 }
 
 func (s *serviceDesc) execute() string {
